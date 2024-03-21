@@ -1,0 +1,5 @@
+fastapi
+Uvicorn[standard]
+modbus-tcp-server
+pyModbusTCP
+pymodbus
