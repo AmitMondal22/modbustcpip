@@ -1,66 +1,32 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from pyModbusTCP.server import ModbusServer, DataBank
+from time import sleep
+from random import uniform
+from fastapi import FastAPI
 
-# Create FastAPI instance
+# Create an instance of ModbusServer
+server = ModbusServer("127.0.0.1", 502, no_block=True)
+
+# Create an instance of FastAPI
 app = FastAPI()
 
-
-# Set up CORS
-origins = [
-    "http://localhost",
-    "http://localhost:8000",
-    "http://192.168.29.10:8000",
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-# Create a Modbus server instance
-server = ModbusServer("127.0.0.1", 1024, no_block=True)  # Assuming port 502
-
-# Start the Modbus server
-def start_modbus_server():
+@app.on_event("startup")
+async def startup_event():
+    print("Starting server...")
     server.start()
-    print("Modbus TCP server started")
+    print("Server is online")
 
-# Stop the Modbus server
-def stop_modbus_server():
+@app.on_event("shutdown")
+async def shutdown_event():
+    print("Shutting down server...")
     server.stop()
-    print("Modbus TCP server stopped")
+    print("Server is offline")
 
-# Function to read coil status
-def read_coil_status(coil_address):
-    coil_status = DataBank.get_bits(coil_address, 1)
-    return coil_status[0] if coil_status else None
+@app.get("/modbus/{coil_address}")
+async def read_modbus_register(coil_address: int):
+    await server.data_bank.set_input_registers(0, [coil_address])
+    return {"value": 50}
 
-# Route to start the Modbus server
-@app.get("/start_modbus_server")
-async def start_server_route():
-    start_modbus_server()
-    return {"message": "Modbus TCP server starting..."}
-
-# Route to stop the Modbus server
-@app.get("/stop_modbus_server")
-async def stop_server_route():
-    stop_modbus_server()
-    return {"message": "Modbus TCP server stopping..."}
-
-# Route to read coil status
-@app.get("/read_coil_status/{coil_address}")
-async def read_coil_status_route(coil_address: int):
-    coil_status = read_coil_status(coil_address)
-    if coil_status is not None:
-        return {"coil_address": coil_address, "coil_status": coil_status}
-    else:
-        return {"error": "Failed to read coil status"}
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)
